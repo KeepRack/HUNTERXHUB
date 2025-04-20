@@ -159,12 +159,12 @@ local function startLoading()
     end
 
     local loadingSteps = {
-        {progress = 0.1, status = "Connecting to game...", delay = 3},
-        {progress = 0.3, status = "Loading resources...", delay = 3},
-        {progress = 0.5, status = "Initializing services...", delay = 3},
-        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 3},
-        {progress = 0.9, status = "Finalizing...", delay = 3},
-        {progress = 1.0, status = "Complete!", delay = 3}
+        {progress = 0.1, status = "Connecting to game...", delay = 2},
+        {progress = 0.3, status = "Loading resources...", delay = 2},
+        {progress = 0.5, status = "Initializing services...", delay = 2},
+        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 2},
+        {progress = 0.9, status = "Finalizing...", delay = 1},
+        {progress = 1.0, status = "Complete!", delay = 1}
     }
 
     spawn(function()
@@ -237,21 +237,21 @@ spawn(function()
     startLoading()
 end)
 
-local function waitForLoading()
-    local startTime = tick()
-    local timeout = HUNTER_X.Config.LoadingDelay + 30
+-- local function waitForLoading()
+--     local startTime = tick()
+--     local timeout = HUNTER_X.Config.LoadingDelay + 10
     
-    repeat
-        wait(0.1)
-        if (tick() - startTime) > timeout then
-            debugWarn("Loading timed out after " .. timeout .. " seconds")
-            return false
-        end
-    until HUNTER_X.Loading.Completed
+--     repeat
+--         wait(0.1)
+--         if (tick() - startTime) > timeout then
+--             debugWarn("Loading timed out after " .. timeout .. " seconds")
+--             return false
+--         end
+--     until HUNTER_X.Loading.Completed
     
-    debugLog("Loading completed successfully")
-    return true
-end
+--     debugLog("Loading completed successfully")
+--     return true
+-- end
 
 local function initializeMainScript()
     debugLog("Initializing main script...")
@@ -269,7 +269,7 @@ local function initializeMainScript()
     debugLog("Main script initialized successfully")
 end
 
-waitForLoading()
+-- waitForLoading()
 initializeMainScript()
 
 return HUNTER_X
