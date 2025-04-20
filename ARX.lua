@@ -1,4 +1,12 @@
-local LoadingSystem = loadstring(game:HttpGet("https://raw.githubusercontent.com/KeepRack/HUNTERXHUB/refs/heads/main/Loading.lua"))()
+local LoadingSystem = loadstring(game:HttpGet("https://raw.githubusercontent.com/KeepRack/HUNTERXHUB/refs/heads/main/Loading.lua"))() or {
+    Loading = {
+        Completed = false
+    }
+}
+
+if not _G.ScriptStartTime then
+    _G.ScriptStartTime = tick()
+end
 
 while not LoadingSystem.Loading.Completed do
     task.wait(0.1)
@@ -7,12 +15,14 @@ while not LoadingSystem.Loading.Completed do
     end
 end
 
+_G.VoteMode = _G.VoteMode or "Retry"
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
-local HUNTER_X = LoadingSystem or {
+local HUNTER_X = {
     Paths = {
         RewardsUIPath = nil
     },
@@ -25,9 +35,8 @@ local HUNTER_X = LoadingSystem or {
         CurrentYen = 0,
         UpgradeTarget = nil,
         NewGameDetected = false,
-        RetryVoteSent = false,
-        RetryAttempts = 0,
-        AntiAFKEnabled = true
+        VoteSent = false,
+        VoteAttempts = 0
     },
     PrintFlags = {
         ClickStarted = false,
@@ -42,6 +51,7 @@ local HUNTER_X = LoadingSystem or {
     },
     Services = {
         VirtualInputManager = VirtualInputManager,
+        Players = Players,
         VirtualUser = VirtualUser
     },
     Config = {
@@ -49,12 +59,42 @@ local HUNTER_X = LoadingSystem or {
         UpgradeRetryInterval = 1.0,
         MaxUpgradeAttempts = 3,
         AfterGameDelay = 5,
-        AfterRetryDelay = 2,
-        RetryCheckInterval = 1.0,
-        MaxRetryAttempts = 5,
-        DebugMode = false
+        AfterVoteDelay = 2,
+        VoteCheckInterval = 1.0,
+        MaxVoteAttempts = 5,
+        DebugMode = false,
+        VoteMode = _G.VoteMode or "Retry"
     }
 }
+
+function SetupAntiAFK()
+    local LocalPlayer = HUNTER_X.Services.Players.LocalPlayer
+
+    if not LocalPlayer then
+        for i = 1, 10 do
+            LocalPlayer = HUNTER_X.Services.Players.LocalPlayer
+            if LocalPlayer then break end
+            wait(0.5)
+        end
+    end
+
+    if not LocalPlayer then
+        if HUNTER_X.Config.DebugMode then
+            print("❌ Failed to get LocalPlayer for Anti-AFK")
+        end
+        return
+    end
+    
+    LocalPlayer.Idled:Connect(function()
+        HUNTER_X.Services.VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        wait(1)
+        HUNTER_X.Services.VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1.5)
+        if HUNTER_X.Config.DebugMode then
+            print("✅ Anti-AFK Activated")
+        end
+    end)
+end
 
 local hasPrinted = false
 local hasPrintedYen = false
@@ -66,16 +106,23 @@ local maxUpgradeAttempts = HUNTER_X.Config.MaxUpgradeAttempts
 while not Players.LocalPlayer do wait(0.1) end
 local player = Players.LocalPlayer
 
-spawn(function()
-    if HUNTER_X.States.AntiAFKEnabled then
-        debugLog("Anti-AFK system initialized")
-        player.Idled:Connect(function()
-            debugLog("Anti-AFK triggered - simulating activity")
-            HUNTER_X.Services.VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-            wait(1)
-            HUNTER_X.Services.VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        end)
+function debugLog(message)
+    if HUNTER_X.Config.DebugMode then
+        print("[DEBUG] " .. tostring(message))
     end
+end
+
+function debugWarn(message)
+    if HUNTER_X.Config.DebugMode then
+        warn("[DEBUG] " .. tostring(message))
+    end
+end
+
+spawn(function()
+    wait(5)
+    while not Players.LocalPlayer do wait(0.5) end
+    SetupAntiAFK()
+    debugLog("Anti-AFK system initialized")
 end)
 
 spawn(function()
@@ -92,7 +139,7 @@ spawn(function()
         
         if not HUNTER_X.Paths.RewardsUIPath then
             player.PlayerGui.ChildAdded:Connect(function(child)
-                if child.Name == "RewardsUI" then
+                if child and child.Name == "RewardsUI" then
                     HUNTER_X.Paths.RewardsUIPath = child
                 end
             end)
@@ -100,24 +147,16 @@ spawn(function()
     end
 end)
 
-function debugLog(message)
-    if HUNTER_X.Config.DebugMode then
-        print("[DEBUG] " .. message)
-    end
-end
-
-function debugWarn(message)
-    if HUNTER_X.Config.DebugMode then
-        warn("[DEBUG] " .. message)
-    end
-end
+local voteSent = false
 
 function sendVotePlaying()
-    ReplicatedStorage.Remote.Server.OnGame.Voting.VotePlaying:FireServer()
-    if not hasPrinted then
-        debugLog("Vote sent successfully!")
-        hasPrinted = true
+    if not voteSent then
+        ReplicatedStorage.Remote.Server.OnGame.Voting.VotePlaying:FireServer()
+        debugLog("VotePlaying vote sent (single time)")
+        voteSent = true
+        
         hasVoted = true
+        hasPrinted = true
         
         spawn(checkYen)
         spawn(checkUnits)
@@ -131,37 +170,46 @@ function sendVotePlaying()
 end
 
 spawn(function()
-    while wait(0.5) do
-        pcall(function()
-            if player and player.PlayerGui and 
-               player.PlayerGui.HUD and 
-               player.PlayerGui.HUD.InGame and 
-               player.PlayerGui.HUD.InGame.VotePlaying and 
-               player.PlayerGui.HUD.InGame.VotePlaying.Frame and 
-               player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote and 
-               player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote.Visible then
-                
-                sendVotePlaying()
-            end
-        end)
-    end
-end)
-
-spawn(function()
-    while not (player and player.PlayerGui and 
-              player.PlayerGui.HUD and 
-              player.PlayerGui.HUD.InGame and 
-              player.PlayerGui.HUD.InGame.VotePlaying and 
-              player.PlayerGui.HUD.InGame.VotePlaying.Frame and 
-              player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote) do
+    local waitTime = 0
+    while not (player and player.PlayerGui) do
         wait(0.1)
+        waitTime = waitTime + 0.1
+        if waitTime > 10 then break end
+    end
+    
+    if not player or not player.PlayerGui then return end
+    
+    while not (player.PlayerGui:FindFirstChild("HUD") and 
+              player.PlayerGui.HUD:FindFirstChild("InGame") and 
+              player.PlayerGui.HUD.InGame:FindFirstChild("VotePlaying") and 
+              player.PlayerGui.HUD.InGame.VotePlaying:FindFirstChild("Frame") and 
+              player.PlayerGui.HUD.InGame.VotePlaying.Frame:FindFirstChild("Vote")) do
+        wait(0.1)
+        waitTime = waitTime + 0.1
+        if waitTime > 15 then return end
+    end
+    
+    if player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote.Visible then
+        sendVotePlaying()
     end
     
     player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote:GetPropertyChangedSignal("Visible"):Connect(function()
         if player.PlayerGui.HUD.InGame.VotePlaying.Frame.Vote.Visible then
             sendVotePlaying()
+        else
+            voteSent = false
+            debugLog("Vote button no longer visible - resetting vote status for next round")
         end
     end)
+end)
+
+spawn(function()
+    while wait(2) do
+        if HUNTER_X.States.NewGameDetected then
+            voteSent = false
+            debugLog("New game detected - vote status reset")
+        end
+    end
 end)
 
 function getYen()
@@ -216,7 +264,7 @@ end
 function checkUnits()
     wait(1)
     
-    if not player:FindFirstChild("UnitsFolder") then
+    if not player or not player:FindFirstChild("UnitsFolder") then
         debugWarn("ERROR: Cannot find UnitsFolder")
         return {}
     end
@@ -234,14 +282,14 @@ function checkUnits()
         if unit:FindFirstChild("Upgrade_Folder") and unit.Upgrade_Folder:FindFirstChild("Upgrade_Cost") then
             local cost = unit.Upgrade_Folder.Upgrade_Cost.Value
             unitUpgradeCosts[unit.Name] = cost
-            debugLog("   - Upgrade cost: " .. cost)
+            debugLog("   - Upgrade cost: " .. tostring(cost))
         else
             unitUpgradeCosts[unit.Name] = math.huge
             debugLog("   - Unable to find upgrade cost")
         end
     end
     
-    debugLog("Total Units: " .. count)
+    debugLog("Total Units: " .. tostring(count))
     return unitData
 end
 
@@ -262,7 +310,8 @@ function sortUnitsByCost()
     
     debugLog("Units sorted from lowest to highest cost")
     for i, unitName in ipairs(result) do
-        debugLog(i .. ". " .. unitName .. " - Cost: " .. (unitUpgradeCosts[unitName] == math.huge and "Unknown" or unitUpgradeCosts[unitName]))
+        local costText = unitUpgradeCosts[unitName] == math.huge and "Unknown" or tostring(unitUpgradeCosts[unitName])
+        debugLog(i .. ". " .. unitName .. " - Cost: " .. costText)
     end
     
     return result
@@ -270,7 +319,7 @@ end
 
 function upgradeUnit(unitName)
     if HUNTER_X.UnitUpgrade.paused then
-        debugLog("Unit upgrading is currently paused: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Unit upgrading is currently paused: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
         return false
     end
 
@@ -280,7 +329,7 @@ function upgradeUnit(unitName)
     end
     
     if not player.UnitsFolder:FindFirstChild(unitName) then
-        debugWarn("ERROR: Cannot find unit: " .. unitName)
+        debugWarn("ERROR: Cannot find unit: " .. tostring(unitName))
         return false
     end
     
@@ -289,13 +338,13 @@ function upgradeUnit(unitName)
     }
     
     ReplicatedStorage.Remote.Server.Units.Upgrade:FireServer(unpack(args))
-    debugLog("Upgrade request sent for: " .. unitName)
+    debugLog("Upgrade request sent for: " .. tostring(unitName))
     return true
 end
 
 function isUnitMaxLevel(unitName)
     if HUNTER_X.UnitUpgrade.paused then
-        debugLog("Unit upgrading is currently paused: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Unit upgrading is currently paused: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
         return true
     end
 
@@ -332,20 +381,20 @@ function isUnitMaxLevel(unitName)
                     end
                 end
                 
-                debugLog(unitName .. " appears to be at MAX level")
+                debugLog(tostring(unitName) .. " appears to be at MAX level")
                 return true
             else
                 return false
             end
         end
     else
-        debugLog("Not enough Yen to check if " .. unitName .. " is maxed")
+        debugLog("Not enough Yen to check if " .. tostring(unitName) .. " is maxed")
         
         HUNTER_X.States.WaitingForYen = true
         HUNTER_X.States.YenTargetAmount = currentCost
         HUNTER_X.States.UpgradeTarget = unitName
         
-        debugLog("Waiting for " .. currentCost .. " Yen to continue upgrading " .. unitName)
+        debugLog("Waiting for " .. tostring(currentCost) .. " Yen to continue upgrading " .. tostring(unitName))
         return false
     end
     
@@ -356,18 +405,18 @@ function pauseUpgradeProcess(reason)
     if not HUNTER_X.UnitUpgrade.paused then
         HUNTER_X.UnitUpgrade.paused = true
         HUNTER_X.UnitUpgrade.lastPausedReason = reason or "No reason specified"
-        debugLog("Unit upgrade process paused: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Unit upgrade process paused: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
     end
 end
 
 function resumeUpgradeProcess()
     if HUNTER_X.UnitUpgrade.paused then
         HUNTER_X.UnitUpgrade.paused = false
-        debugLog("Unit upgrade process resumed after: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Unit upgrade process resumed after: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
         HUNTER_X.UnitUpgrade.lastPausedReason = ""
         
         if HUNTER_X.States.UpgradeTarget and not HUNTER_X.UnitUpgrade.upgradeInProgress then
-            debugLog("Resuming upgrade for: " .. HUNTER_X.States.UpgradeTarget)
+            debugLog("Resuming upgrade for: " .. tostring(HUNTER_X.States.UpgradeTarget))
             startUpgradeProcess(HUNTER_X.States.UpgradeTarget)
         end
     end
@@ -380,7 +429,7 @@ function startUpgradeProcess(resumeFromUnit)
     end
     
     if HUNTER_X.UnitUpgrade.paused and not HUNTER_X.UnitUpgrade.needsRestart then
-        debugLog("Cannot start upgrade process while paused: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Cannot start upgrade process while paused: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
         return
     end
 
@@ -391,7 +440,7 @@ function startUpgradeProcess(resumeFromUnit)
 
     if HUNTER_X.UnitUpgrade.paused then
         HUNTER_X.UnitUpgrade.paused = false
-        debugLog("Forced resume of upgrade process: " .. HUNTER_X.UnitUpgrade.lastPausedReason)
+        debugLog("Forced resume of upgrade process: " .. tostring(HUNTER_X.UnitUpgrade.lastPausedReason))
         HUNTER_X.UnitUpgrade.lastPausedReason = ""
     end
     
@@ -406,7 +455,8 @@ function startUpgradeProcess(resumeFromUnit)
     local sortedUnits = sortUnitsByCost()
     debugLog("Units sorted by upgrade cost (lowest to highest):")
     for i, unitName in ipairs(sortedUnits) do
-        debugLog(i .. ". " .. unitName .. " - Cost: " .. (unitUpgradeCosts[unitName] == math.huge and "Unknown" or unitUpgradeCosts[unitName]))
+        local costText = unitUpgradeCosts[unitName] == math.huge and "Unknown" or tostring(unitUpgradeCosts[unitName])
+        debugLog(i .. ". " .. unitName .. " - Cost: " .. costText)
     end
     
     local startIndex = 1
@@ -427,7 +477,7 @@ function startUpgradeProcess(resumeFromUnit)
             break
         end
         
-        debugLog("Working on unit: " .. unitName)
+        debugLog("Working on unit: " .. tostring(unitName))
         
         local maxReached = false
         local noYenReported = false
@@ -435,12 +485,12 @@ function startUpgradeProcess(resumeFromUnit)
         while not maxReached and not HUNTER_X.UnitUpgrade.paused do
             local unit = player.UnitsFolder:FindFirstChild(unitName)
             if not unit then
-                debugLog("Unit " .. unitName .. " no longer exists, skipping")
+                debugLog("Unit " .. tostring(unitName) .. " no longer exists, skipping")
                 break
             end
             
             if not unit:FindFirstChild("Upgrade_Folder") or not unit.Upgrade_Folder:FindFirstChild("Upgrade_Cost") then
-                debugLog("Cannot find upgrade cost for " .. unitName .. ", skipping")
+                debugLog("Cannot find upgrade cost for " .. tostring(unitName) .. ", skipping")
                 break
             end
             
@@ -449,11 +499,11 @@ function startUpgradeProcess(resumeFromUnit)
             
             if currentYen >= currentCost then
                 if noYenReported then
-                    debugLog("Sufficient Yen accumulated, continuing upgrade for " .. unitName)
+                    debugLog("Sufficient Yen accumulated, continuing upgrade for " .. tostring(unitName))
                     noYenReported = false
                 end
                 
-                debugLog("Upgrading " .. unitName .. " (Cost: " .. currentCost .. ", Yen: " .. currentYen .. ")")
+                debugLog("Upgrading " .. tostring(unitName) .. " (Cost: " .. tostring(currentCost) .. ", Yen: " .. tostring(currentYen) .. ")")
                 
                 upgradeUnit(unitName)
                 wait(0.5)
@@ -461,7 +511,7 @@ function startUpgradeProcess(resumeFromUnit)
                 maxReached = isUnitMaxLevel(unitName)
             else
                 if not noYenReported then
-                    debugLog("Not enough Yen to upgrade " .. unitName .. " (Need: " .. currentCost .. ", Have: " .. currentYen .. ")")
+                    debugLog("Not enough Yen to upgrade " .. tostring(unitName) .. " (Need: " .. tostring(currentCost) .. ", Have: " .. tostring(currentYen) .. ")")
                     noYenReported = true
                     
                     HUNTER_X.States.WaitingForYen = true
@@ -482,7 +532,7 @@ function startUpgradeProcess(resumeFromUnit)
         end
         
         if not HUNTER_X.UnitUpgrade.paused then
-            debugLog("Finished with " .. unitName .. ", moving to next unit")
+            debugLog("Finished with " .. tostring(unitName) .. ", moving to next unit")
         end
         
         wait(0.5)
@@ -505,7 +555,7 @@ function waitForYenAndResume(unitName, targetAmount)
         local currentYen = getYen()
         
         if waitCycles % 10 == 0 then
-            debugLog("Waiting for Yen: Have " .. currentYen .. " / Need " .. targetAmount)
+            debugLog("Waiting for Yen: Have " .. tostring(currentYen) .. " / Need " .. tostring(targetAmount))
         end
         
         if currentYen >= targetAmount then
@@ -520,6 +570,22 @@ function waitForYenAndResume(unitName, targetAmount)
     end
 end
 
+function sendVote()
+    local voteMode = HUNTER_X.Config.VoteMode
+    
+    if voteMode == "Next" then
+        ReplicatedStorage.Remote.Server.OnGame.Voting.VoteNext:FireServer()
+        debugLog("VoteNext sent: Attempt " .. tostring(HUNTER_X.States.VoteAttempts))
+    else
+        ReplicatedStorage.Remote.Server.OnGame.Voting.VoteRetry:FireServer()
+        debugLog("VoteRetry sent: Attempt " .. tostring(HUNTER_X.States.VoteAttempts))
+    end
+    
+    HUNTER_X.States.VoteSent = true
+    HUNTER_X.UnitUpgrade.needsRestart = true
+    HUNTER_X.States.NewGameDetected = true
+end
+
 function CheckVisualsAndAutoClick()
     local isRewardsUIVisible = false
     
@@ -530,7 +596,7 @@ function CheckVisualsAndAutoClick()
     if isRewardsUIVisible then
         if not HUNTER_X.States.GameEnded then
             HUNTER_X.States.GameEnded = true
-            HUNTER_X.States.RetryAttempts = 0
+            HUNTER_X.States.VoteAttempts = 0
             debugLog("Game has ended! Detected RewardsUI")
         end
         
@@ -548,7 +614,7 @@ function CheckVisualsAndAutoClick()
             pauseUpgradeProcess("Rewards UI is visible (Game Ended)")
         end
         
-        CheckAndVoteRetry()
+        CheckAndVote()
         
         return
     end
@@ -561,7 +627,7 @@ function CheckVisualsAndAutoClick()
         HUNTER_X.UnitUpgrade.needsRestart = true
         
         spawn(function()
-            debugLog("Will start a new upgrade cycle in " .. HUNTER_X.Config.AfterGameDelay .. " seconds")
+            debugLog("Will start a new upgrade cycle in " .. tostring(HUNTER_X.Config.AfterGameDelay) .. " seconds")
             wait(HUNTER_X.Config.AfterGameDelay)
 
             if HUNTER_X.States.NewGameDetected then
@@ -581,8 +647,9 @@ function CheckVisualsAndAutoClick()
     
     local visualGemExists = workspace:FindFirstChild("Visual") and workspace.Visual:FindFirstChild("Gem")
     local visualExpExists = workspace:FindFirstChild("Visual") and workspace.Visual:FindFirstChild("Exp")
+    local visualGoldExists = workspace:FindFirstChild("Visual") and workspace.Visual:FindFirstChild("Gold")
     
-    if visualGemExists or visualExpExists then
+    if visualGemExists or visualExpExists or visualGoldExists then
         if not HUNTER_X.States.ClickActive then
             HUNTER_X.States.ClickActive = true
             HUNTER_X.PrintFlags.ClickStopped = false
@@ -610,7 +677,7 @@ function CheckVisualsAndAutoClick()
     end
 end
 
-function CheckAndVoteRetry()
+function CheckAndVote()
     local isRewardsUIVisible = false
     
     pcall(function()
@@ -619,36 +686,39 @@ function CheckAndVoteRetry()
     
     if isRewardsUIVisible then
         if not HUNTER_X.States.RetryActionExecuted then
-            HUNTER_X.States.RetryAttempts = HUNTER_X.States.RetryAttempts + 1
-            ReplicatedStorage.Remote.Server.OnGame.Voting.VoteRetry:FireServer()
+            HUNTER_X.States.VoteAttempts = HUNTER_X.States.VoteAttempts + 1
+            sendVote()
             HUNTER_X.States.RetryActionExecuted = true
-            HUNTER_X.States.RetryVoteSent = true
-            debugLog("VoteRetry sent: Attempt " .. HUNTER_X.States.RetryAttempts)
+            
+            local voteType = HUNTER_X.Config.VoteMode == "Next" and "VoteNext" or "VoteRetry"
+            debugLog(voteType .. " sent: Attempt " .. tostring(HUNTER_X.States.VoteAttempts))
 
             HUNTER_X.UnitUpgrade.needsRestart = true
             HUNTER_X.States.NewGameDetected = true
             
             spawn(function()
-                local timeBetweenRetries = 0.5
+                local timeBetweenVotes = 0.5
                 for i = 1, 8 do
-                    wait(timeBetweenRetries)
+                    wait(timeBetweenVotes)
                     pcall(function()
-                        if isRewardsUIVisible and HUNTER_X.States.RetryAttempts < HUNTER_X.Config.MaxRetryAttempts then
-                            ReplicatedStorage.Remote.Server.OnGame.Voting.VoteRetry:FireServer()
-                            HUNTER_X.States.RetryAttempts = HUNTER_X.States.RetryAttempts + 1
-                            debugLog("Additional VoteRetry sent: Attempt " .. HUNTER_X.States.RetryAttempts)
+                        if isRewardsUIVisible and HUNTER_X.States.VoteAttempts < HUNTER_X.Config.MaxVoteAttempts then
+                            HUNTER_X.States.VoteAttempts = HUNTER_X.States.VoteAttempts + 1
+                            sendVote()
+                            
+                            local voteType = HUNTER_X.Config.VoteMode == "Next" and "VoteNext" or "VoteRetry"
+                            debugLog("Additional " .. voteType .. " sent: Attempt " .. tostring(HUNTER_X.States.VoteAttempts))
                         end
                     end)
                 end
                 
-                wait(HUNTER_X.Config.AfterRetryDelay)
+                wait(HUNTER_X.Config.AfterVoteDelay)
                 HUNTER_X.States.RetryActionExecuted = false
             end)
         end
     elseif not isRewardsUIVisible then
         if HUNTER_X.States.RetryActionExecuted then
             HUNTER_X.States.RetryActionExecuted = false
-            debugLog("Ready for next VoteRetry: RewardsUI is no longer visible")
+            debugLog("Ready for next Vote: RewardsUI is no longer visible")
         end
     end
 end
@@ -668,7 +738,7 @@ spawn(function()
                 HUNTER_X.Paths.RewardsUIPath = player.PlayerGui.RewardsUI
                 
                 if HUNTER_X.Paths.RewardsUIPath.Enabled and not HUNTER_X.States.RetryActionExecuted then
-                    CheckAndVoteRetry()
+                    CheckAndVote()
                 end
             end
         end)
@@ -676,15 +746,18 @@ spawn(function()
 end)
 
 spawn(function()
-    while not HUNTER_X.Paths.RewardsUIPath do
+    while true do
+        if HUNTER_X.Paths.RewardsUIPath then
+            break
+        end
         wait(0.5)
     end
     
-    debugLog("Auto-VoteRetry system initialized")
+    debugLog("Auto-Vote system initialized (Mode: " .. tostring(HUNTER_X.Config.VoteMode) .. ")")
     
     HUNTER_X.Paths.RewardsUIPath:GetPropertyChangedSignal("Enabled"):Connect(function()
         if HUNTER_X.Paths.RewardsUIPath.Enabled then
-            CheckAndVoteRetry()
+            CheckAndVote()
         end
     end)
 end)
@@ -700,9 +773,9 @@ spawn(function()
     debugLog("Auto-retry upgrade system initialized")
     while wait(HUNTER_X.Config.UpgradeRetryInterval) do
         pcall(function()
-            if HUNTER_X.States.RetryVoteSent and HUNTER_X.UnitUpgrade.needsRestart and not HUNTER_X.States.GameEnded then
-                debugLog("Attempting to restart upgrade process after retry vote")
-                HUNTER_X.States.RetryVoteSent = false
+            if HUNTER_X.States.VoteSent and HUNTER_X.UnitUpgrade.needsRestart and not HUNTER_X.States.GameEnded then
+                debugLog("Attempting to restart upgrade process after vote")
+                HUNTER_X.States.VoteSent = false
 
                 if player and player:FindFirstChild("UnitsFolder") and #player.UnitsFolder:GetChildren() > 0 then
                     debugLog("Units found, restarting upgrade process")
@@ -726,7 +799,7 @@ spawn(function()
                 local currentYen = getYen()
                 
                 if currentYen >= targetAmount then
-                    debugLog("Sufficient Yen detected for " .. targetUnit .. "! Resuming upgrade process")
+                    debugLog("Sufficient Yen detected for " .. tostring(targetUnit) .. "! Resuming upgrade process")
                     HUNTER_X.States.WaitingForYen = false
                     resumeUpgradeProcess()
                 end
@@ -736,8 +809,8 @@ spawn(function()
 end)
 
 spawn(function()
-    debugLog("Active retry system initialized")
-    while wait(HUNTER_X.Config.RetryCheckInterval) do
+    debugLog("Active vote system initialized (Mode: " .. tostring(HUNTER_X.Config.VoteMode) .. ")")
+    while wait(HUNTER_X.Config.VoteCheckInterval) do
         pcall(function()
             local isRewardsUIVisible = false
             pcall(function() 
@@ -745,11 +818,13 @@ spawn(function()
             end)
             
             if isRewardsUIVisible then
-                if not HUNTER_X.States.RetryActionExecuted or HUNTER_X.States.RetryAttempts < HUNTER_X.Config.MaxRetryAttempts then
-                    ReplicatedStorage.Remote.Server.OnGame.Voting.VoteRetry:FireServer()
-                    HUNTER_X.States.RetryAttempts = HUNTER_X.States.RetryAttempts + 1
-                    debugLog("Proactive VoteRetry sent: Attempt " .. HUNTER_X.States.RetryAttempts)
-                    HUNTER_X.States.RetryVoteSent = true
+                if not HUNTER_X.States.RetryActionExecuted or HUNTER_X.States.VoteAttempts < HUNTER_X.Config.MaxVoteAttempts then
+                    sendVote() 
+                    HUNTER_X.States.VoteAttempts = HUNTER_X.States.VoteAttempts + 1
+                    
+                    local voteType = HUNTER_X.Config.VoteMode == "Next" and "VoteNext" or "VoteRetry"
+                    debugLog("Proactive " .. voteType .. " sent: Attempt " .. HUNTER_X.States.VoteAttempts)
+                    HUNTER_X.States.VoteSent = true
                 end
             end
         end)
