@@ -159,12 +159,12 @@ local function startLoading()
     end
 
     local loadingSteps = {
-        {progress = 0.1, status = "Connecting to game...", delay = 0.5},
-        {progress = 0.3, status = "Loading resources...", delay = 0.5},
-        {progress = 0.5, status = "Initializing services...", delay = 0.5},
-        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 0.5},
-        {progress = 0.9, status = "Finalizing...", delay = 0.5},
-        {progress = 1.0, status = "Complete!", delay = 0.5}
+        {progress = 0.1, status = "Connecting to game...", delay = 1},
+        {progress = 0.3, status = "Loading resources...", delay = 1},
+        {progress = 0.5, status = "Initializing services...", delay = 1},
+        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 1},
+        {progress = 0.9, status = "Finalizing...", delay = 1},
+        {progress = 1.0, status = "Complete!", delay = 1}
     }
 
     spawn(function()
