@@ -237,21 +237,21 @@ spawn(function()
     startLoading()
 end)
 
--- local function waitForLoading()
---     local startTime = tick()
---     local timeout = HUNTER_X.Config.LoadingDelay + 10
+local function waitForLoading()
+    local startTime = tick()
+    local timeout = HUNTER_X.Config.LoadingDelay + 10
     
---     repeat
---         wait(0.1)
---         if (tick() - startTime) > timeout then
---             debugWarn("Loading timed out after " .. timeout .. " seconds")
---             return false
---         end
---     until HUNTER_X.Loading.Completed
+    repeat
+        wait(0.1)
+        if (tick() - startTime) > timeout then
+            debugWarn("Loading timed out after " .. timeout .. " seconds")
+            return false
+        end
+    until HUNTER_X.Loading.Completed
     
---     debugLog("Loading completed successfully")
---     return true
--- end
+    debugLog("Loading completed successfully")
+    return true
+end
 
 local function initializeMainScript()
     debugLog("Initializing main script...")
@@ -269,7 +269,7 @@ local function initializeMainScript()
     debugLog("Main script initialized successfully")
 end
 
--- waitForLoading()
+waitForLoading()
 initializeMainScript()
 
 return HUNTER_X
