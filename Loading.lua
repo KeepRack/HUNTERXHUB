@@ -32,9 +32,9 @@ local HUNTER_X = {
         YenCheckInterval = 0.5,
         UpgradeRetryInterval = 1.0,
         MaxUpgradeAttempts = 3,
-        AfterGameDelay = 1,
+        AfterGameDelay = 5,
         DebugMode = false,
-        LoadingDelay = 1
+        LoadingDelay = 5
     },
     Loading = {
         Started = false,
