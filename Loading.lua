@@ -32,9 +32,9 @@ local HUNTER_X = {
         YenCheckInterval = 0.5,
         UpgradeRetryInterval = 1.0,
         MaxUpgradeAttempts = 3,
-        AfterGameDelay = 5,
+        AfterGameDelay = 1,
         DebugMode = false,
-        LoadingDelay = 5
+        LoadingDelay = 1
     },
     Loading = {
         Started = false,
@@ -259,6 +259,7 @@ local function initializeMainScript()
     wait(HUNTER_X.Config.LoadingDelay)
 
     spawn(function()
+        wait(2)
         if player and player.PlayerGui then
             HUNTER_X.Paths.RewardsUIPath = player.PlayerGui:FindFirstChild("RewardsUI")
             debugLog("RewardsUI Path: " .. (HUNTER_X.Paths.RewardsUIPath and "Found" or "Not Found"))
