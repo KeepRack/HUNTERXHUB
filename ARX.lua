@@ -2,7 +2,7 @@ local LoadingSystem = loadstring(game:HttpGet("https://raw.githubusercontent.com
 
 while not LoadingSystem.Loading.Completed do
     wait(1)
-    if tick() - _G.ScriptStartTime > 1 then
+    if tick() - _G.ScriptStartTime > 30 then
         break
     end
 end
