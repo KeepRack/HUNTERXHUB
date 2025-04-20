@@ -1,8 +1,8 @@
 local LoadingSystem = loadstring(game:HttpGet("https://raw.githubusercontent.com/KeepRack/HUNTERXHUB/refs/heads/main/Loading.lua"))()
 
 while not LoadingSystem.Loading.Completed do
-    task.wait(0.1)
-    if tick() - _G.ScriptStartTime > 1 then
+    wait(1)
+    if tick() - _G.ScriptStartTime > 30 then
         break
     end
 end
