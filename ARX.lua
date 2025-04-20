@@ -10,6 +10,7 @@ end
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser") -- Added for Anti-AFK
 
 local HUNTER_X = LoadingSystem or {
     Paths = {
@@ -39,7 +40,9 @@ local HUNTER_X = LoadingSystem or {
         needsRestart = false
     },
     Services = {
-        VirtualInputManager = VirtualInputManager
+        VirtualInputManager = VirtualInputManager,
+        Players = Players,
+        VirtualUser = VirtualUser -- Added for Anti-AFK
     },
     Config = {
         YenCheckInterval = 0.5,
@@ -53,6 +56,19 @@ local HUNTER_X = LoadingSystem or {
     }
 }
 
+-- Function to set up Anti-AFK
+function SetupAntiAFK()
+    local LocalPlayer = HUNTER_X.Services.Players.LocalPlayer
+    
+    LocalPlayer.Idled:Connect(function()
+        HUNTER_X.Services.VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        wait(1)
+        HUNTER_X.Services.VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1.5)
+        debugLog("✅ Anti-AFK Activated")
+    end)
+end
+
 local hasPrinted = false
 local hasPrintedYen = false
 local hasVoted = false
@@ -62,6 +78,13 @@ local maxUpgradeAttempts = HUNTER_X.Config.MaxUpgradeAttempts
 
 while not Players.LocalPlayer do wait(0.1) end
 local player = Players.LocalPlayer
+
+-- Initialize Anti-AFK right after getting the player
+spawn(function()
+    wait(2)
+    SetupAntiAFK()
+    debugLog("Anti-AFK system initialized")
+end)
 
 spawn(function()
     wait(1)
