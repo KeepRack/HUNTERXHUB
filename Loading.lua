@@ -239,7 +239,7 @@ end)
 
 local function waitForLoading()
     local startTime = tick()
-    local timeout = HUNTER_X.Config.LoadingDelay + 3
+    local timeout = HUNTER_X.Config.LoadingDelay + 1
     
     repeat
         wait(0.1)
@@ -259,7 +259,7 @@ local function initializeMainScript()
     wait(HUNTER_X.Config.LoadingDelay)
 
     spawn(function()
-        wait(2)
+        wait(1)
         if player and player.PlayerGui then
             HUNTER_X.Paths.RewardsUIPath = player.PlayerGui:FindFirstChild("RewardsUI")
             debugLog("RewardsUI Path: " .. (HUNTER_X.Paths.RewardsUIPath and "Found" or "Not Found"))
