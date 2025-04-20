@@ -239,7 +239,7 @@ end)
 
 local function waitForLoading()
     local startTime = tick()
-    local timeout = HUNTER_X.Config.LoadingDelay + 10
+    local timeout = HUNTER_X.Config.LoadingDelay + 3
     
     repeat
         wait(0.1)
