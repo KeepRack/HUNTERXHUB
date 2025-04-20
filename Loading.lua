@@ -159,12 +159,12 @@ local function startLoading()
     end
 
     local loadingSteps = {
-        {progress = 0.1, status = "Connecting to game...", delay = 1},
-        {progress = 0.3, status = "Loading resources...", delay = 1},
-        {progress = 0.5, status = "Initializing services...", delay = 1},
-        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 1},
-        {progress = 0.9, status = "Finalizing...", delay = 1},
-        {progress = 1.0, status = "Complete!", delay = 1}
+        {progress = 0.1, status = "Connecting to game...", delay = 3},
+        {progress = 0.3, status = "Loading resources...", delay = 3},
+        {progress = 0.5, status = "Initializing services...", delay = 3},
+        {progress = 0.7, status = "Preparing auto-upgrade system...", delay = 3},
+        {progress = 0.9, status = "Finalizing...", delay = 3},
+        {progress = 1.0, status = "Complete!", delay = 3}
     }
 
     spawn(function()
@@ -239,7 +239,7 @@ end)
 
 local function waitForLoading()
     local startTime = tick()
-    local timeout = HUNTER_X.Config.LoadingDelay + 10
+    local timeout = HUNTER_X.Config.LoadingDelay + 30
     
     repeat
         wait(0.1)
