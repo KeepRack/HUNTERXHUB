@@ -177,7 +177,7 @@ local function startLoading()
         wait(0.5)
         ui.StatusLabel.Text = "Ready!"
 
-        wait(1)
+        wait(0.5)
 
         local fadeOut = TweenService:Create(
             ui.ScreenGui.MainFrame,
@@ -259,7 +259,6 @@ local function initializeMainScript()
     wait(HUNTER_X.Config.LoadingDelay)
 
     spawn(function()
-        wait(2)
         if player and player.PlayerGui then
             HUNTER_X.Paths.RewardsUIPath = player.PlayerGui:FindFirstChild("RewardsUI")
             debugLog("RewardsUI Path: " .. (HUNTER_X.Paths.RewardsUIPath and "Found" or "Not Found"))
