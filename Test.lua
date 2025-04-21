@@ -1,4 +1,4 @@
-repeat wait(15) until game:IsLoaded()
+repeat wait(12) until game:IsLoaded()
 
 -- _G.Enable = true -- true, false
 -- _G.VotePlay = true -- true, false
