@@ -47,8 +47,8 @@ local SystemState = {
     lastGameState = nil,
 
     upgradeDelayActive = false,
-    upgradeDelayStartTime = 0,
-    upgradeDelayDuration = 0,
+    upgradeDelayStartTime = 3,
+    upgradeDelayDuration = 3,
     
     autoClick = {
         clickActive = false,
