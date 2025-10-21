@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -21,100 +23,93 @@ whiteFrame.BorderSizePixel = 0
 whiteFrame.Parent = screenGui
 
 for _, gui in pairs(playerGui:GetChildren()) do
-    if gui ~= screenGui then
-        savedGuiStates[gui] = gui.Enabled
-        gui.Enabled = false
-    end
+	if gui ~= screenGui then
+		savedGuiStates[gui] = gui.Enabled
+		gui.Enabled = false
+	end
+end
+
+local cam = workspace.CurrentCamera
+local FAR_STUDS = 120000
+local keepCamConn
+
+local savedCam = {
+	CameraType = cam.CameraType,
+	CameraSubject = cam.CameraSubject,
+	CFrame = cam.CFrame,
+}
+
+local function setFarCamera()
+	local pos = Vector3.new(FAR_STUDS, FAR_STUDS, FAR_STUDS)
+	local lookAt = pos + Vector3.new(0, 0, -1)
+	savedCam.CameraType = cam.CameraType
+	savedCam.CameraSubject = cam.CameraSubject
+	savedCam.CFrame = cam.CFrame
+
+	cam.CameraType = Enum.CameraType.Scriptable
+	cam.CameraSubject = nil
+	cam.CFrame = CFrame.new(pos, lookAt)
+
+	if keepCamConn then keepCamConn:Disconnect() end
+	keepCamConn = RunService.RenderStepped:Connect(function()
+		cam.CameraType = Enum.CameraType.Scriptable
+		cam.CameraSubject = nil
+		cam.CFrame = CFrame.new(pos, lookAt)
+	end)
+end
+
+local function restoreCamera()
+	if keepCamConn then keepCamConn:Disconnect() keepCamConn = nil end
+	cam.CameraType = savedCam.CameraType
+	cam.CameraSubject = savedCam.CameraSubject
+	cam.CFrame = savedCam.CFrame
 end
 
 local function toggleWhiteScreen()
-    whiteScreenEnabled = not whiteScreenEnabled
-    
-    if whiteScreenEnabled then
-        RunService:Set3dRenderingEnabled(false)
-        whiteFrame.Visible = true
+	whiteScreenEnabled = not whiteScreenEnabled
 
-        for _, gui in pairs(playerGui:GetChildren()) do
-            if gui ~= screenGui then
-                gui.Enabled = false
-            end
-        end
+	if whiteScreenEnabled then
+		whiteFrame.Visible = true
 
-        local StarterGui = game:GetService("StarterGui")
-        StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+		for _, gui in pairs(playerGui:GetChildren()) do
+			if gui ~= screenGui then
+				gui.Enabled = false
+			end
+		end
 
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        workspace.StreamingEnabled = false
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+		setFarCamera()
 
-        if player.Character then
-            for _, part in pairs(player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                    part.Anchored = true
-                elseif part:IsA("Script") or part:IsA("LocalScript") then
-                    part.Enabled = false
-                end
-            end
-        end
-        
-        workspace:SetAttribute("PhysicsDisabled", true)
-        
-        print("White Screen ON - 3D Rendering OFF - CPU Optimized")
-    else
-        RunService:Set3dRenderingEnabled(true)
-        whiteFrame.Visible = false
+		print("White Screen ON - Camera moved far away - Scripts untouched")
+	else
+		whiteFrame.Visible = false
 
-        for gui, wasEnabled in pairs(savedGuiStates) do
-            if gui and gui.Parent then
-                gui.Enabled = wasEnabled
-            end
-        end
+		for gui, wasEnabled in pairs(savedGuiStates) do
+			if gui and gui.Parent then
+				gui.Enabled = wasEnabled
+			end
+		end
 
-        local StarterGui = game:GetService("StarterGui")
-        StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+		restoreCamera()
 
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-        workspace.StreamingEnabled = true
-
-        if player.Character then
-            for _, part in pairs(player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Anchored = false
-                elseif part:IsA("Script") or part:IsA("LocalScript") then
-                    part.Enabled = true
-                end
-            end
-        end
-        
-        workspace:SetAttribute("PhysicsDisabled", false)
-        
-        print("White Screen OFF - 3D Rendering ON - Normal Mode")
-    end
+		print("White Screen OFF - Camera restored - Normal Mode")
+	end
 end
 
-RunService:Set3dRenderingEnabled(false)
-local StarterGui = game:GetService("StarterGui")
+setFarCamera()
 StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-workspace.StreamingEnabled = false
-settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-
-if player.Character then
-    for _, part in pairs(player.Character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-            part.Anchored = true
-        elseif part:IsA("Script") or part:IsA("LocalScript") then
-            part.Enabled = false
-        end
-    end
-end
-
-workspace:SetAttribute("PhysicsDisabled", true)
+whiteFrame.Visible = true
+print("Maximum CPU optimization (camera-only). Press F1 to toggle.")
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.F1 then
-        toggleWhiteScreen()
-    end
+	if not gameProcessed and input.KeyCode == Enum.KeyCode.F1 then
+		toggleWhiteScreen()
+	end
 end)
 
-print("Maximum CPU optimization complete - Press F1 to toggle - 3D Rendering OFF")
+player.CharacterAdded:Connect(function()
+	if whiteScreenEnabled then
+		task.defer(setFarCamera)
+	end
+end)
